@@ -1,0 +1,1 @@
+{"name":"sbt","version":"1.7.2","bspVersion":"2.0.0-M5","languages":["scala"],"argv":["/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home/bin/java","-Xms100m","-Xmx100m","-classpath","/Users/evink/.sdkman/candidates/sbt/1.7.2/bin/sbt-launch.jar","-Dsbt.script=/Users/evink/.sdkman/candidates/sbt/current/bin/sbt","xsbt.boot.Boot","-bsp"]}

@@ -1,0 +1,14 @@
+class alu extends Module {
+  val io = IO(new Bundle {
+    val a = Input(UInt(8.W))
+    val b = Input(UInt(8.W))
+    val op = Input(UInt(1.W))
+    val out = Output(UInt(8.W))
+  })
+  val result = RegInit(0.U(8.W))
+  when (op) {
+  result := io.a + io.b
+  }
+  result := io.a - io.b
+  io.out := result
+}

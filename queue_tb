@@ -1,0 +1,14 @@
+test(new QueueModule(UInt(8.W), entries = 200)) { c =>
+    // Example testsequence showing the use and behavior of Queue
+    c.in.initSource()
+    c.in.setSourceClock(c.clock)
+    c.out.initSink()
+    c.out.setSinkClock(c.clock)
+    
+    val testVector = Seq.tabulate(200){ i => i.U }
+
+    testVector.zip(testVector).foreach { case (in, out) =>
+      c.in.enqueueNow(in)
+      c.out.expectDequeueNow(out)
+    }
+}
