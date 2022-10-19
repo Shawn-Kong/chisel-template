@@ -26,15 +26,37 @@ object QueueDriver {
     // at this point ready and valid are both true
     clock.step(1)
     interface.valid.poke(false.B)
-    interface.bits.poke(0.U)
+    interface.bits.poke(0.U)  //?? Now the queue only accept 1 value?
   }
 }
 
 object QueueReciever {
+  // a function that can get the bits out from 
+  // an enqueuing Decoupled interface to a transaction. 
   def receive(interface: DecoupledIO[UInt], clock: Clock): Transaction = {
 
+    //val interface_out = Flipped(interface)
     val peeked = interface.bits.peek()
+    //printf(cf"peeked = $peeked")
+    //printf(s"peeked = %d\n", peeked)
+    // assert(peeked == 100.U, "The decoupled interface is not empty, peaked is %d\n")
+    assert(peeked.litOption.isDefined, "The decoupled interface is now empty")
+    interface.ready.poke(true.B)
+    
+    while (!interface.valid.peek().litToBoolean) {
+      clock.step(1)
+    }
+
+    clock.step(1)
     val t = new Transaction(32)
-    t.Lit(b => b.bits -> 0.U)
+    t.Lit(b => b.bits -> peeked)
+
+    clock.step(1)
+    interface.ready.poke(false.B)
+    //interface.bits.poke(0.U)
+
+    return t
+    //val peeked = interface.bits.peek()
+    //assert(peeked.litOption.isDefined, "The decoupled interface is now empty")
   }
 }
