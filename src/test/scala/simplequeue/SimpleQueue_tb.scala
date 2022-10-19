@@ -12,17 +12,25 @@ class QueueTest extends AnyFreeSpec with ChiselScalatestTester {
   "run a test" in {
     test(new Queue(UInt(32.W), 8)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       c.clock.step(10)
-      QueueDriver.drive(new Transaction(32).Lit(b => b.bits -> 100.U), c.io.enq, c.clock)
+      val txns = (0 until 4).map{ i =>
+        new Transaction(32).Lit(b => b.bits -> (100+i).U)
+      }
+      txns.foreach { t=>
+        QueueDriver.drive(t , c.io.enq, c.clock)
+      }
       c.clock.step(5)
       //val peeked = c.io.deq.bits.peek()
       //import peeked.implicits._
       //printf(s"peeked (s) = %d\n", peeked)
       //printf(cf"peeked (cf) = $peeked")
-      val t = QueueReciever.receive(c.io.deq, c.clock)
+      val recvTxns = (0 until 4).foldLeft(Seq[Transaction]()){ (seq, i) =>
+        seq :+ QueueReciever.receive(c.io.deq, c.clock)
+      }
       c.clock.step(1)
+      println(recvTxns)
       //printf("t.bits.litValue = %d/n", t.bits.litValue)
-      printf(p" t.bits.litValue = $t.bits.litValue")
-      assert(t.bits.litValue == 100, "the value was not 100")
+      //printf(p" t.bits.litValue = $t.bits.litValue")
+      //assert(t.bits.litValue == 100, "the value was not 100")
       c.clock.step(5)
 
       // TODO: use chiseltest fork/join to drive and receive in parallel
@@ -37,7 +45,7 @@ class QueueTest extends AnyFreeSpec with ChiselScalatestTester {
       })
   */
 
-
+/*
   "run a parallel test" in {
     test(new Queue(UInt(32.W), 8)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
     val testVector = Seq.tabulate(10){ i => i.U }
@@ -55,6 +63,7 @@ class QueueTest extends AnyFreeSpec with ChiselScalatestTester {
       }.join()
     }
   }
+ */
 }
 /*
     //one data transaction

@@ -36,26 +36,25 @@ object QueueReciever {
   def receive(interface: DecoupledIO[UInt], clock: Clock): Transaction = {
 
     //val interface_out = Flipped(interface)
-    val peeked = interface.bits.peek()
     //printf(cf"peeked = $peeked")
     //printf(s"peeked = %d\n", peeked)
     // assert(peeked == 100.U, "The decoupled interface is not empty, peaked is %d\n")
-    assert(peeked.litOption.isDefined, "The decoupled interface is now empty")
+    //assert(peeked.litOption.isDefined, "This is impossible")
     interface.ready.poke(true.B)
     
     while (!interface.valid.peek().litToBoolean) {
       clock.step(1)
     }
-
+    val peeked = interface.bits.peek()
     clock.step(1)
+    interface.ready.poke(false.B)
     val t = new Transaction(32)
     t.Lit(b => b.bits -> peeked)
 
-    clock.step(1)
-    interface.ready.poke(false.B)
+    //clock.step(1)
     //interface.bits.poke(0.U)
 
-    return t
+    // return t
     //val peeked = interface.bits.peek()
     //assert(peeked.litOption.isDefined, "The decoupled interface is now empty")
   }
