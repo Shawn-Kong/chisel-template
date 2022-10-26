@@ -12,6 +12,8 @@ class Transaction(width: Int) extends Bundle {
   val bits: UInt = UInt(width.W) 
 }
 
+class Transaction[T <: Data](gen: T) extends Bundle { val bits: T = gen }
+
 object QueueDriver {
   //a function that can drive a transaction 
   //into an enqueuing Decoupled interface
@@ -34,14 +36,7 @@ object QueueReciever {
   // a function that can get the bits out from 
   // an enqueuing Decoupled interface to a transaction. 
   def receive(interface: DecoupledIO[UInt], clock: Clock): Transaction = {
-
-    //val interface_out = Flipped(interface)
-    //printf(cf"peeked = $peeked")
-    //printf(s"peeked = %d\n", peeked)
-    // assert(peeked == 100.U, "The decoupled interface is not empty, peaked is %d\n")
-    //assert(peeked.litOption.isDefined, "This is impossible")
     interface.ready.poke(true.B)
-    
     while (!interface.valid.peek().litToBoolean) {
       clock.step(1)
     }
@@ -50,12 +45,5 @@ object QueueReciever {
     interface.ready.poke(false.B)
     val t = new Transaction(32)
     t.Lit(b => b.bits -> peeked)
-
-    //clock.step(1)
-    //interface.bits.poke(0.U)
-
-    // return t
-    //val peeked = interface.bits.peek()
-    //assert(peeked.litOption.isDefined, "The decoupled interface is now empty")
   }
 }

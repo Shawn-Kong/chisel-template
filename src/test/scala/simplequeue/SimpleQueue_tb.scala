@@ -19,52 +19,58 @@ class QueueTest extends AnyFreeSpec with ChiselScalatestTester {
         QueueDriver.drive(t , c.io.enq, c.clock)
       }
       c.clock.step(5)
-      //val peeked = c.io.deq.bits.peek()
-      //import peeked.implicits._
-      //printf(s"peeked (s) = %d\n", peeked)
-      //printf(cf"peeked (cf) = $peeked")
       val recvTxns = (0 until 4).foldLeft(Seq[Transaction]()){ (seq, i) =>
-        seq :+ QueueReciever.receive(c.io.deq, c.clock)
+        seq :+ QueueReciever.receive(c.io.deq, c.clock)  // repeat 4 times with (0 until 4) and what is "i?
       }
       c.clock.step(1)
       println(recvTxns)
-      //printf("t.bits.litValue = %d/n", t.bits.litValue)
-      //printf(p" t.bits.litValue = $t.bits.litValue")
-      //assert(t.bits.litValue == 100, "the value was not 100")
       c.clock.step(5)
-
       // TODO: use chiseltest fork/join to drive and receive in parallel
       // TODO: define a software model of queue
     }
   }
-    /*
-    test(new Queue(8, UInt(32.W))){ c => // call drive with some Transactions }
-      val io = IO(new Bundle {
-        val producer = Decoupled(UInt(32.W))
-        val consumer = Flipped(Decoupled(UInt(32.W)))  // how to deal with a sequence of data in transaction?
-      })
-  */
 
-/*
-  "run a parallel test" in {
+    "run a parallel test" in {
     test(new Queue(UInt(32.W), 8)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
-    val testVector = Seq.tabulate(10){ i => i.U }
+    val txns = (0 until 10).map{ i =>
+        new Transaction(32).Lit(_.bits -> (i).U)
+      }
+    val seq:Seq[Transaction] = Seq()  
+      fork{
+        txns.foreach { t=>
+        QueueDriver.drive(t , c.io.enq, c.clock)
+        c.clock.step(1)
+      }
+      }.fork{
+        c.clock.step(2)
+        //val sseq = 
+        //val sseq +: t
+        val recvTxns = (0 until 4).foldLeft(Seq[Transaction]()){ (seq, i) =>
+        seq :+ QueueReciever.receive(c.io.deq, c.clock)
+        }
+      }.join()
+    }
+  }
+}
+
+  /*"run a parallel test" in {
+    test(new Queue(UInt(32.W), 8)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
+    val testVector = Seq.tabulate(7){ i => i.U }
+    // println(testVector)
     
       fork{
         for (a <- testVector) {
         QueueDriver.drive(new Transaction(32).Lit(_ -> a), c.io.enq, c.clock)
         }
+        c.clock.step(1)
       }.fork{
-        for (b <- testVector) {
-        val t = QueueReciever.receive(c.io.deq, c.clock)
-        assert(t.bits.litValue == b, "the value was not 100")
         c.clock.step(2)
-        }
-      }.join()
+        val t = QueueReciever.receive(c.io.deq, c.clock)
+        println(t)
+        }.join()
     }
   }
- */
-}
+}*/
 /*
     //one data transaction
     // Producer := (new Decoupled).Lit(_.valid -> true.B, _.ready -> true.B, _.data->8.U ) // can I write f.U here?
