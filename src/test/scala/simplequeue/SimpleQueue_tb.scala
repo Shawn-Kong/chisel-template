@@ -15,13 +15,13 @@ class QueueTest extends AnyFreeSpec with ChiselScalatestTester {
     test(new Queue(gen, 8)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       c.clock.step(10)
       val txns = (0 until 4).map{ i =>
-        new Transaction(gen).Lit(b => b.bits -> (100+i).U)
+        new DrvTx(gen).Lit(b => b.bits -> (100+i).U)
       }
       txns.foreach { t=>
         QueueDriver.drive(t , c.io.enq, c.clock)
       }
       c.clock.step(5)
-      val recvTxns = mutable.ListBuffer[Transaction[UInt]]()
+      val recvTxns = mutable.ListBuffer[MonTx[UInt]]()
       for (i <- 0 until 4) {
         recvTxns.addOne(QueueReciever.receive(c.io.deq, c.clock, gen)) 
       }
@@ -40,9 +40,9 @@ class QueueTest extends AnyFreeSpec with ChiselScalatestTester {
     val gen = UInt(32.W)
     test(new Queue(gen, 8)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val txns = (0 until 10).map{ i =>
-        new Transaction(gen).Lit(_.bits -> (i).U)
+        new DrvTx(gen).Lit(_.bits -> (i).U)
       }
-      val recvTxns = mutable.ListBuffer[Transaction[UInt]]()
+      val recvTxns = mutable.ListBuffer[MonTx[UInt]]()
       fork {
         txns.foreach { t =>
           QueueDriver.drive(t, c.io.enq, c.clock)
