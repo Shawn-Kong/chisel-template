@@ -15,7 +15,7 @@ class QueueTest extends AnyFreeSpec with ChiselScalatestTester {
     test(new Queue(gen, 8)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       c.clock.step(10)
       val txns = (0 until 4).map{ i =>
-        new DrvTx(gen).Lit(b => b.bits -> (100+i).U)
+        new DrvTx(gen).Lit(b => b.bits -> (100+i).U, _.preDelay -> 0.U, _.postDelay -> 0.U)
       }
       txns.foreach { t=>
         QueueDriver.drive(t , c.io.enq, c.clock)
@@ -40,7 +40,7 @@ class QueueTest extends AnyFreeSpec with ChiselScalatestTester {
     val gen = UInt(32.W)
     test(new Queue(gen, 8)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val txns = (0 until 10).map{ i =>
-        new DrvTx(gen).Lit(_.bits -> (i).U)
+        new DrvTx(gen).Lit(_.bits -> i.U, _.preDelay -> 0.U, _.postDelay -> 0.U)
       }
       val recvTxns = mutable.ListBuffer[MonTx[UInt]]()
       fork {
@@ -62,25 +62,33 @@ class QueueTest extends AnyFreeSpec with ChiselScalatestTester {
     val gen = UInt(32.W)
     test(new Queue(gen, 8)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
       val txns = (0 until 10).map{ i =>
-        new DrvTx(gen).Lit(_.bits -> (i).U, _.preDelay -> 1.U, _.postDelay -> 2.U)
+        new DrvTx(gen).Lit(_.bits -> i.U, _.preDelay -> 1.U, _.postDelay -> 2.U)
       }
       val recvTxns = mutable.ListBuffer[MonTx[UInt]]()
-      fork {
+      val mDrvThread = fork {
         txns.foreach { t =>
           QueueDriver.drive(t, c.io.enq, c.clock)
           c.clock.step(1)
         }
-      }.fork{
+      }
+      val sDrvThread = fork {
         c.clock.step(20)
         for (i <- (0 until 10)) {
           recvTxns.addOne(QueueReciever.receive(c.io.deq, c.clock, gen))
         }
-      }.fork{
+      }
+
+      fork.withRegion(Monitor){
+        println("IN thE MONITOR")
+        val monitor = new QueueMonitor()
         while (true) {
-          val p = QueueMonitor.receiveOne(c.io.enq, c.clock, gen)
+          val p = monitor.receiveOne(c.io.enq, c.clock, gen)
           println(p)
         }
-      }.join()
+      }
+
+      mDrvThread.join()
+      sDrvThread.join()
       //println(recvTxns)
     }
   }

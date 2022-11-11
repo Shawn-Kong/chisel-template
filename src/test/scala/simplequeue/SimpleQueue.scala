@@ -17,7 +17,8 @@ class Transaction(width: Int) extends Bundle {
 
 class MonTx[T <: Data](gen: T) extends Bundle {
   val bits: T = gen
-  val cycleStamp = UInt(32.W)}
+  val cycleStamp = UInt(32.W)
+}
 
 class DrvTx[T <: Data](gen: T) extends Bundle {
   val bits: T = gen
@@ -32,8 +33,8 @@ object QueueDriver {
     assert(t.bits.litOption.isDefined)
     
     interface.bits.poke(t.bits)
-    var preDelay = t.preDelay.litValue()
-    var postDelay = t.postDelay.litValue()
+    var preDelay = t.preDelay.litValue
+    var postDelay = t.postDelay.litValue
 
     while (preDelay > 0) {
       preDelay = preDelay - 1
@@ -64,7 +65,7 @@ object QueueReciever {
 
     val rand = new scala.util.Random
     var waitTime = rand.nextInt(10)
-    println(waitTime)
+    //println(waitTime)
 
     while (waitTime > 0){
       waitTime -= 1
@@ -82,27 +83,27 @@ object QueueReciever {
     interface.ready.poke(false.B)
     val t = new MonTx(gen)
     val ret = t.Lit(b => b.bits -> peeked)
-    println(ret)
+    //println(ret)
     ret
   }
 }
 
 
-object QueueMonitor {
+class QueueMonitor {
+  var cycleCount = 0
+
   def receiveOne[T <: Data](intf: DecoupledIO[T], clock: Clock, gen:T): MonTx[T]= {
-    var txn: MonTx[T] = null
-    var cycleCount = 0 
     while (true) {
       if (intf.valid.peek().litToBoolean && intf.ready.peek().litToBoolean) {
         val t = new MonTx(gen)
         val recvTxn = t.Lit(_.bits -> intf.bits.peek(), _.cycleStamp -> (cycleCount).U)
-        txn = recvTxn
-        // recvTxns += txn;
+        clock.step()
+        return recvTxn
       }
       cycleCount += 1
       clock.step()
     }
-    txn
+    ???
   }
 }
 
