@@ -34,7 +34,7 @@ object QueueDriver {
   }
 }
 
-object QueueReciever {
+object QueueReciever extends Iterator[T] {
   // a function that can get the bits out from 
   // an enqueuing Decoupled interface to a transaction. 
   def receive[T <: Data](interface: DecoupledIO[T], clock: Clock, gen: T): Transaction[T] = {
@@ -60,7 +60,14 @@ object QueueReciever {
   }
 }
 
-object QueueMonitor {
+object QueueMonitor extends Iterator[T]{
+
+  def hasNext = ;
+
+  def next[T <: Data](): Transaction[T] = {
+    if (hasNext)
+  } 
+  
   def monitor[T <: Data](driver_interface: DecoupledIO[T], receiver_interface: DecoupledIO[T], clock: Clock, gen:T)= { //what should be the type here: : mutable 
     val recvTxns = mutable.ListBuffer[Transaction[T]]()
     var cycleCount = 0;
