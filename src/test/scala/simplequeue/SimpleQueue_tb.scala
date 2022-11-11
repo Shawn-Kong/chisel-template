@@ -57,5 +57,33 @@ class QueueTest extends AnyFreeSpec with ChiselScalatestTester {
       println(recvTxns)
     }
   }
+
+    "run a monitor test" in {
+    val gen = UInt(32.W)
+    test(new Queue(gen, 8)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
+      val txns = (0 until 10).map{ i =>
+        new DrvTx(gen).Lit(_.bits -> (i).U, _.preDelay -> 1.U, _.postDelay -> 2.U)
+      }
+      val recvTxns = mutable.ListBuffer[MonTx[UInt]]()
+      fork {
+        txns.foreach { t =>
+          QueueDriver.drive(t, c.io.enq, c.clock)
+          c.clock.step(1)
+        }
+      }.fork{
+        c.clock.step(20)
+        for (i <- (0 until 10)) {
+          recvTxns.addOne(QueueReciever.receive(c.io.deq, c.clock, gen))
+        }
+      }.fork{
+        while (true) {
+          val p = QueueMonitor.receiveOne(c.io.enq, c.clock, gen)
+          println(p)
+        }
+      }.join()
+      //println(recvTxns)
+    }
+  }
+
 }
 

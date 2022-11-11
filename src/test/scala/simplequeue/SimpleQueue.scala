@@ -30,14 +30,29 @@ object QueueDriver {
   //a function that can drive a transaction into an enqueuing Decoupled interface
   def drive[T <: Data](t: DrvTx[T], interface: DecoupledIO[T], clock: Clock): Unit = {
     assert(t.bits.litOption.isDefined)
-    interface.valid.poke(true.B)
+    
     interface.bits.poke(t.bits)
+    var preDelay = t.preDelay.litValue()
+    var postDelay = t.postDelay.litValue()
+
+    while (preDelay > 0) {
+      preDelay = preDelay - 1
+      clock.step(1)
+    }
+
+    interface.valid.poke(true.B)
 
     while (!interface.ready.peek().litToBoolean) {
       clock.step(1)
     }
+
     clock.step(1)
     interface.valid.poke(false.B)
+
+    while (postDelay > 0) {
+      postDelay = postDelay - 1
+      clock.step(1)
+    }
   }
 }
 
@@ -50,15 +65,18 @@ object QueueReciever {
     val rand = new scala.util.Random
     var waitTime = rand.nextInt(10)
     println(waitTime)
+
     while (waitTime > 0){
       waitTime -= 1
       interface.ready.poke(false.B)
       clock.step(1)
     }
+
     interface.ready.poke(true.B)
     while (!interface.valid.peek().litToBoolean) {
       clock.step(1)
     }
+
     val peeked: T = interface.bits.peek()
     clock.step(1)
     interface.ready.poke(false.B)
@@ -70,52 +88,42 @@ object QueueReciever {
 }
 
 
-object QueueMonitor extends Iterator[T]{
-
-  def hasNext = ;
-
-  def next[T <: Data](): Transaction[T] = {
-    if (hasNext)
-  } 
-  
-  def monitor[T <: Data](driver_interface: DecoupledIO[T], receiver_interface: DecoupledIO[T], clock: Clock, gen:T)= { //what should be the type here: : mutable 
-    val recvTxns = mutable.ListBuffer[Transaction[T]]()
-    var cycleCount = 0;
-    while (true) {
-    if (driver_interface.valid.peek().litToBoolean && receiver_interface.ready.peek().litToBoolean) {
-      val t = new Transaction(gen);
-      val txn = t.Lit(_.bits -> driver_interface.bits.peek(), _.cycleStamp -> cycleCount.U)
-      recvTxns.addOne(txn)
-    }
-    cycleCount += 1
-    clock.step()
-
 object QueueMonitor {
-  def monitor[T <: Data](intf: DecoupledIO[T], clock: Clock, gen:T): LazyList[MonTx[T]] = { //what should be the type here: : mutable
-    //val recvTxns = mutable.ListBuffer[MonTx[T]]()
-    def receiveOne(): MonTx[T] = {
-      var txn: MonTx[T] = null
-      while (true) {
-        if (intf.valid.peek().litToBoolean && intf.ready.peek().litToBoolean) {
-          val t = new MonTx(gen)
-          val recvTxn = t.Lit(_.bits -> intf.bits.peek(), _.cycleStamp -> 0.U)
-          txn = recvTxn
-        }
-        //cycleCount += 1
-        clock.step()
-        break
+  def receiveOne[T <: Data](intf: DecoupledIO[T], clock: Clock, gen:T): MonTx[T]= {
+    var txn: MonTx[T] = null
+    var cycleCount = 0 
+    while (true) {
+      if (intf.valid.peek().litToBoolean && intf.ready.peek().litToBoolean) {
+        val t = new MonTx(gen)
+        val recvTxn = t.Lit(_.bits -> intf.bits.peek(), _.cycleStamp -> (cycleCount).U)
+        txn = recvTxn
+        // recvTxns += txn;
       }
-      txn
-
+      cycleCount += 1
+      clock.step()
     }
-    LazyList.iterate(receiveOne())(_ => receiveOne())
-    // LazyList(new Iterator[MonTx[T]] {
-    //   override def hasNext: Boolean = true
-
-    //   override def next(): MonTx[T] = receiveOne()
-    // })
-    //var cycleCount = 0;
+    txn
   }
-  
-
 }
+
+
+// object QueueMonitor {
+//   def monitor[T <: Data](intf: DecoupledIO[T], clock: Clock, gen:T): LazyList[MonTx[T]] = { //what should be the type here: : mutable
+//     val recvTxns = mutable.ListBuffer[MonTx[T]]()
+//     def receiveOne(): MonTx[T] = {
+//       var txn: MonTx[T] = null
+//       val cycleCount = 0 
+//       while (true) {
+//         if (intf.valid.peek().litToBoolean && intf.ready.peek().litToBoolean) {
+//           val t = new MonTx(gen)
+//           val recvTxn = t.Lit(_.bits -> intf.bits.peek(), _.cycleStamp -> (cycleCount).U)
+//           txn = recvTxn
+//           recvTxns += txn;
+//         }
+//         cycleCount += 1
+//         clock.step()
+//       }
+//       txn
+//     }
+//   }
+// }
