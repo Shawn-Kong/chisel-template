@@ -63,11 +63,14 @@ class QueueTest extends AnyFreeSpec with ChiselScalatestTester {
   "run a FIFOSimulation test" in {
     val gen = UInt(32.W)
     test(new Queue(gen, 8)).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
-    val driverTxn = (0 until 10).map{ i => new DrvTx(gen).Lit(_.bits -> i.U, _.preDelay -> 1.U, _.postDelay -> 2.U)}
-    // val slaveTxn = (0 until 10).map{ i => new SlvTx(gen).Lit(_.bits -> i.U, _.waitTime -> 3.U)}
+      val driverTxn = (0 until 10).map{ i => new MasterDrvTx(gen).Lit(_.bits -> i.U, _.preDelay -> 1.U, _.postDelay -> 2.U)}
+      val slaveTxn = (0 until 10).map{ i => new SlaveDrvTx().Lit(_.waitTime -> 3.U)}
 
-    val result = FifoSimulation.runFIFOSimulation(c.io.enq, c.io.deq, driverTxn, gen, c.clock)
-    println(result)
+      val result = FifoSimulation.runFIFOSimulation(c.io.enq, c.io.deq, driverTxn, slaveTxn, gen, c.clock)
+      val (enqTxns, deqTxns) = (result._1, result._2)
+      enqTxns.zip(deqTxns).foreach { case (enqTx, deqTx) =>
+        assert(enqTx.bits.litValue == deqTx.bits.litValue)
+      }
     }
   }
   //   "run a monitor test" in {
