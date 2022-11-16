@@ -160,7 +160,7 @@ object FifoSimulation{
         val monitor = new QueueMonitor()
         while (true) {
           val p = monitor.receiveOne(masterInterface, clock, gen)
-          enqTxns.addOne(p)
+          enqTxns += p
         }
     }
 
@@ -168,7 +168,7 @@ object FifoSimulation{
       val monitor = new QueueMonitor()
       while (true) {
         val p = monitor.receiveOne(slaveInterface, clock, gen)
-        deqTxns.(p)
+        deqTxns += p
       }
     }
 
