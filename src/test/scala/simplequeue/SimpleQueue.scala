@@ -85,6 +85,7 @@ object QueueDriver {
 //   }
 // }
 
+// object is just a singleton, we cannot instantiate it, but we can only call functions on it. 
 object QueueReciever {
   // a function that can get the bits out from
   // an enqueuing Decoupled interface to a transaction.
@@ -177,6 +178,9 @@ object FifoSimulation{
   }
   
 }
+
+// writing AXI driver and monitors. 
+// force the thread in the monitor region to implement after all the data. Enforce ordering;
 
 // object QueueMonitor {
 //   def monitor[T <: Data](intf: DecoupledIO[T], clock: Clock, gen:T): LazyList[MonTx[T]] = { //what should be the type here: : mutable
