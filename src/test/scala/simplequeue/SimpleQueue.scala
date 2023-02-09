@@ -14,23 +14,22 @@ class MonTx[T <: Data](gen: T) extends Bundle {
   val cycleStamp = UInt(32.W)
 }
 
-class DrvTx[T <: Data](gen: T) extends Bundle {
+class MasterDrvTx[T <: Data](gen: T) extends Bundle {
   val bits: T = gen
   val preDelay = UInt(32.W)
   val postDelay = UInt(32.W)
 }
 
-class SlvTx[T <: Data](gen: T) extends Bundle {
-  val bits: T = gen
+class SlaveDrvTx() extends Bundle {
   val waitTime = UInt(32.W)
 }
 
 
 object QueueDriver {
   //a function that can drive a transaction into an enqueuing Decoupled interface
-  def drive[T <: Data](t: DrvTx[T], interface: DecoupledIO[T], clock: Clock): Unit = {
+  def drive[T <: Data](t: MasterDrvTx[T], interface: DecoupledIO[T], clock: Clock): Unit = {
     assert(t.bits.litOption.isDefined)
-    
+
     interface.bits.poke(t.bits)
     var preDelay = t.preDelay.litValue
     var postDelay = t.postDelay.litValue
@@ -74,7 +73,7 @@ object QueueDriver {
 //       clock.step(1)
 //     }
 
-//     val peeked: T = interface.bits.peek() //here, peeked has two fields: 
+//     val peeked: T = interface.bits.peek() //here, peeked has two fields:
 
 //     clock.step(1)
 //     interface.ready.poke(false.B)
@@ -89,12 +88,12 @@ object QueueDriver {
 object QueueReciever {
   // a function that can get the bits out from
   // an enqueuing Decoupled interface to a transaction.
-  def receive[T <: Data](interface: DecoupledIO[T], waitTime: UInt, clock: Clock, gen: T): SlvTx[T] = {
 
+  def receive[T <: Data](interface: DecoupledIO[T], clock: Clock, tx: SlaveDrvTx): Unit = {
     // val rand = new scala.util.Random
     // var waitTime = rand.nextInt(10)
     //println(waitTime)
-    var wait = waitTime.litValue
+    var wait = tx.waitTime.litValue
 
     while (wait > 0){
       wait -= 1
@@ -107,13 +106,13 @@ object QueueReciever {
       clock.step(1)
     }
 
-    val peeked: T = interface.bits.peek()
+    //val peeked: T = interface.bits.peek()
     clock.step(1)
     interface.ready.poke(false.B)
-    val t = new SlvTx(gen)
-    val ret = t.Lit(b => b.bits -> peeked, _.waitTime -> waitTime)
+    //val t = new SlaveDrvTx(gen)
+    //val ret = t.Lit(b => b.bits -> peeked, _.waitTime -> waitTime)
     //println(ret)
-    ret
+    //ret
   }
 }
 
@@ -121,7 +120,7 @@ object QueueReciever {
 class QueueMonitor {
   var cycleCount = 0
 
-  def receiveOne[T <: Data](intf: DecoupledIO[T], clock: Clock, gen:T): Unit = {  //MonTx[T]
+  def receiveOne[T <: Data](intf: DecoupledIO[T], clock: Clock, gen:T): MonTx[T] = {  //MonTx[T]
     while (true) {
       if (intf.valid.peek().litToBoolean && intf.ready.peek().litToBoolean) {
         val t = new MonTx(gen)
@@ -132,49 +131,52 @@ class QueueMonitor {
       cycleCount += 1
       clock.step()
     }
+    ???
   }
 }
 
 object FifoSimulation{
 
-  def runFIFOSimulation(masterInterface:DecoupledIO[T], slaveInterface:DecoupledIO[T], 
-  masterTxns: Seq[MasterDecoupledTx], gen:T, clock:Clock):   //slaveTxns: Seq[SlaveDecoupledTx],
-  (ListBuffer[MonTx[T]], ListBuffer[MonTx[T]]) = {
-    val masterMonitorTxns = mutable.ListBuffer[MonTx[UInt]]()
-    val slaveMonitorTxns = mutable.ListBuffer[MonTx[UInt]]()
+  def runFIFOSimulation[T <: Data](masterInterface:DecoupledIO[T], slaveInterface:DecoupledIO[T],
+  masterTxns: Seq[MasterDrvTx[T]], slaveTxns: Seq[SlaveDrvTx], gen:T, clock:Clock):
+  (Seq[MonTx[T]], Seq[MonTx[T]]) = {
 
-    fork {
+    val enqTxns = mutable.ListBuffer[MonTx[T]]()
+    val deqTxns = mutable.ListBuffer[MonTx[T]]()
+
+    val masterDrvThread = fork {
       masterTxns.foreach { mt =>
           QueueDriver.drive(mt, masterInterface, clock)
           clock.step(1)
         }
-    }.fork{
-      while (true) {
-        QueueReciever.receive(slaveInterface, 5.U, clock, gen)
+    }
+    val slaveDrvThread = fork {
+      slaveTxns.foreach { st =>
+        QueueReciever.receive(slaveInterface, clock, st)
+        clock.step(1)
       }
-    }.join()
+    }
 
-    fork.withRegion(Monitor){
-        println("IN THE MONITOR")
+    val enqMonThread = fork.withRegion(Monitor) {
         val monitor = new QueueMonitor()
         while (true) {
           val p = monitor.receiveOne(masterInterface, clock, gen)
-          masterMonitorTxns.addOne(p)
-          println(p)
+          enqTxns += p
         }
-      }
+    }
 
-      fork.withRegion(Monitor){
-        println("IN THE MONITOR")
-        val monitor = new QueueMonitor()
-        while (true) {
-          val p = monitor.receiveOne(slaveInterface, clock, gen)
-          slaveMonitorTxns.addOne(p)
-          println(p)
-        }
+    val deqMonThread = fork.withRegion(Monitor) {
+      val monitor = new QueueMonitor()
+      while (true) {
+        val p = monitor.receiveOne(slaveInterface, clock, gen)
+        deqTxns += p
       }
-    
-    return (masterMonitorTxns, masterMonitorTxns)
+    }
+
+    masterDrvThread.join()
+    slaveDrvThread.join()
+
+    (enqTxns.toSeq, deqTxns.toSeq)
   }
   
 }
